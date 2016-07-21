@@ -99,5 +99,6 @@ Note that `goto` is meant to be used with your shell’s `eval` function, becaus
 that’s the only way to change your shell’s current directory. It prints `pushd
 <directory>`, which the shell must evaluate itself.
 
-## Future Plans 1. Currently `goto` is very Unix-centric. It would be nice to
-## make a Powershell or `cmd.exe` compatible version. 2. ???
+## Future Plans
+1. Currently `goto` is very Unix-centric. It would be nice to make a Powershell or `cmd.exe` compatible version.
+2. Add some testing around the .goto.toml configuration parser :)

@@ -1,3 +1,7 @@
+//! goto :: Flexible Working Directory Shortcuts
+//!
+//! Copyright (c) 2016 by William R. Fraser
+
 extern crate docopt;
 extern crate rustc_serialize;
 extern crate toml;

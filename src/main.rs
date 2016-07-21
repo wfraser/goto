@@ -86,8 +86,8 @@ struct Configuration {
     contexts: BTreeMap<PathBuf, PathMapping>,
 }
 
-fn parse_toml_as_path(t: toml::Value, cwd: Option<&Path>) -> Result<PathBuf, String> {
-    if let toml::Value::String(s) = t {
+fn parse_toml_as_path(t: &toml::Value, cwd: Option<&Path>) -> Result<PathBuf, String> {
+    if let &toml::Value::String(ref s) = t {
         let path: PathBuf = if s.starts_with("~/") {
             env::home_dir().unwrap().join(&Path::new(&s[2..]))
         } else if s.starts_with("/") {
@@ -113,13 +113,13 @@ fn process_config(config_toml: toml::Table) -> Result<Configuration, String> {
         if let toml::Value::Table(t) = v {
             if k == "global" {
                 for (name, path) in t.into_iter() {
-                    match parse_toml_as_path(path, None) {
+                    match parse_toml_as_path(&path, None) {
                         Ok(path) => { config.global.insert(name, path); },
                         Err(msg) => { return Err(format!("error at global.{}: {}", name, msg)); },
                     }
                 }
             } else {
-                let context_path = match parse_toml_as_path(toml::Value::String(k), None) {
+                let context_path = match parse_toml_as_path(&toml::Value::String(k), None) {
                     Ok(path) => path,
                     Err(msg) => { return Err(format!("error: {}", msg)); }
                 };
@@ -127,7 +127,7 @@ fn process_config(config_toml: toml::Table) -> Result<Configuration, String> {
                 let mut context_map = PathMapping::new();
 
                 for (name, path) in t.into_iter() {
-                    let mapped_path: PathBuf = match parse_toml_as_path(path, Some(&context_path)) {
+                    let mapped_path: PathBuf = match parse_toml_as_path(&path, Some(&context_path)) {
                         Ok(path) => path,
                         Err(msg) => {
                             return Err(format!("error at {:?}.{}: {}", context_path, name, msg));
@@ -140,7 +140,16 @@ fn process_config(config_toml: toml::Table) -> Result<Configuration, String> {
                 config.contexts.insert(context_path, context_map);
             }
         } else {
-            return Err(format!("type error at {}: expected a table, not {}", k, v.type_str()));
+            // Attempt to parse any top-level entry (i.e. not under any header) as a path, and if
+            // it works, consider it to be a global entry.
+            match parse_toml_as_path(&v, None) {
+                Ok(path) => { config.global.insert(k, path); },
+                Err(msg) => {
+                    return Err(format!(
+                        "error at {}: expected a table or a path string, not {} ({})",
+                         k, v.type_str(), msg));
+                },
+            }
         }
     }
 

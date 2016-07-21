@@ -20,21 +20,21 @@ typing, right?
 
  `cd ~/projects/current_project/src/com/example/thing/components/frobnicator/lib`
 
-A common workaround is to set up a handful of `alias` -es in your `.bashrc` or
+A common workaround is to set up a handful of `alias`-es in your `.bashrc` or
 other shell init script that go to commonly-used locations.
 
-## Enter `goto` , a more flexible solution.
+## Enter `goto`, a more flexible solution.
 
-`goto`  is a context-sensitive set of shortcuts to your working directories. By
+`goto` is a context-sensitive set of shortcuts to your working directories. By
 context-sensitive, it means what it does depends on where your current directory
 is. You can configure a default working subdirectory (and any number of named
 alternates) for each of the projects you work on. Simply `cd` to anywhere in
-those projects, and type `goto` , and it brings you to that working directory.
+those projects, and type `goto`, and it brings you to that working directory.
 
 ### Configuration
 
 `goto` is configured by a simple plain text file in your home directory,
-`~/.goto.toml` . It uses the TOML format to express structure in an easy-to-read
+`~/.goto.toml`. It uses the TOML format to express structure in an easy-to-read
 way. (TOML is a lot like the well-known “INI” format, but better defined and
 more flexible.)
 
@@ -96,9 +96,10 @@ To download, build, and install:
 (adjust the last two lines as needed to suit your shell)
 
 Note that `goto` is meant to be used with your shell’s `eval` function, because
-that’s the only way to change your shell’s current directory. It prints `pushd
-<directory>`, which the shell must evaluate itself.
+that’s the only way to change your shell’s current directory. It prints
+ `pushd <directory>`, which the shell must evaluate itself.
 
 ## Future Plans
-1. Currently `goto` is very Unix-centric. It would be nice to make a Powershell or `cmd.exe` compatible version.
+1. Currently `goto` is very Unix-centric. It would be nice to make a Powershell
+    or `cmd.exe` compatible version.
 2. Add some testing around the .goto.toml configuration parser :)

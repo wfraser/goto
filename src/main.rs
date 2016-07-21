@@ -9,18 +9,32 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use docopt::Docopt;
 
-const USAGE: &'static str = "
+// 79 columns:
+// ----------------------------------------------------------------------------
+const USAGE: &'static str = r#"
 Usage:
     goto [<name>]
     goto (--help | --version)
 
-Configuration is stored in ~/.goto.toml
+Configuration is stored in ~/.goto.toml, with the following format:
+    [global]
+    name = "/some/path"             # 'goto name' takes you here
+    othername = "~/some/other/path" # $HOME expansion will happen
 
-goto is meant to be used as the argument to your shell's 'eval' builtin, like so:
+    ["/somewhere/specific"]         # Only in effect when in this location:
+    "*" = "default/under/specific"  # With no arguments, this is used.
+    "name" = "somewhere/else"       # Overshadows the one in [global]
+
+Relative paths under a context header are resolved relative to the path in that
+header. In the above example, when your current directory is under
+/somewhere/specific, running 'goto name' takes you to
+/somewhere/specific/somewhere/else.
+
+goto is meant to be used as the argument to your shell's 'eval' builtin, like:
     function goto() {
-        eval $(/usr/local/bin/goto $*)
+        eval $(/usr/local/bin/goto $*)  # or wherever the 'goto' binary is
     }
-";
+"#;
 
 #[derive(Debug, RustcDecodable)]
 struct Args {

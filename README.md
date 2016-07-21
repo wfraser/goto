@@ -29,11 +29,11 @@ A common workaround is to set up a handful of `alias` -es in your `.bashrc` or o
 
 A sample:
 
-    proj = "~/projects/current_project"
-    dl = "~/downloads"
-    pk = "~/packages"
+    proj = "projects/current_project"
+    dl = "downloads"
+    pk = "packages"
 
-    ["~/projects/current_project"]
+    ["projects/current_project"]
     "*" = "src/com/example/thing/components/frobnicator/lib"
     comps = "src/com/example/thing/components"
     test = "tests/thing"
@@ -42,7 +42,7 @@ The top of the file defines a few named shortcuts. These are available from ever
 
 The line in brackets begins a context. It’s only active when you’re in a subdirectory of the path given. It then defines some more shortcuts specific to that context. The `*` shortcut is special: it is the default, used when you don’t call `goto` with any arguments.
 
-The paths inside the context can be given relative to the path of the context itself.
+Paths are relative to your home directory, and the paths inside the context are relative to the path of the context itself.
 
 So in this case, a common flow might be:
 

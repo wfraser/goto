@@ -145,6 +145,15 @@ fn process_config(config_toml: toml::Table, cwd: Option<&Path>) -> Result<Config
     Ok(config)
 }
 
+fn exit(msg: String, fatal: bool) -> ! {
+    io::stderr().write_all(msg.as_bytes()).unwrap();
+    if !msg.ends_with("\n") {
+        io::stderr().write_all(b"\n").unwrap();
+    }
+    let exit_code = if fatal { 1 } else { 0 };
+    ::std::process::exit(exit_code);
+}
+
 fn main() {
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| {
@@ -152,26 +161,25 @@ fn main() {
                                  .decode()
                             })
                             .unwrap_or_else(|e| {
-                                writeln!(io::stderr(), "{}", e).unwrap();
-                                ::std::process::exit(if e.fatal() { 1 } else { 0 });
+                                exit(format!("{}", e), e.fatal());
                             });
 
     let name = args.arg_name.unwrap_or("*".to_owned());
 
     let home = env::home_dir().unwrap_or_else(|| {
-        panic!("unable to determine home directory");
+        exit(format!("unable to determine home directory"), true);
     });
 
     let cwd = PathBuf::from(env::current_dir().unwrap_or_else(|e| {
-        panic!("unable to get current working directory: {}", e);
+        exit(format!("unable to get current working directory: {}", e), true);
     }));
 
     let config_toml = read_config(&home.join(Path::new(CONFIG_FILENAME))).map_err(|e| {
-        panic!("failed to read configuration ~/{}: {}", CONFIG_FILENAME, e);
+        exit(format!("failed to read configuration ~/{}: {}", CONFIG_FILENAME, e), true);
     }).unwrap();
 
     let config = process_config(config_toml, Some(&home)).map_err(|msg| {
-        panic!("invalid configuration in ~/{}: {}", CONFIG_FILENAME, msg);
+        exit(format!("invalid configuration in ~/{}: {}", CONFIG_FILENAME, msg), true);
     }).unwrap();
 
     let mut matched = false;
@@ -196,6 +204,6 @@ fn main() {
     }
 
     if !matched {
-        writeln!(io::stderr(), "not sure where to go").unwrap();
+        exit(format!("not sure where to go"), false);
     }
 }

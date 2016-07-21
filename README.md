@@ -1,4 +1,5 @@
-`goto` – Working Directory Shortcuts
+# `goto` – Working Directory Shortcuts
+
 You open a terminal window, and get to work. But first you need to change directories. If you work on a large project, you probably end up doing that a few times before you’re close to the thing you’re working on.
 
 
@@ -18,11 +19,11 @@ Even if you remember exactly where it is in the tree you’re going, it’s a lo
 
 A common workaround is to set up a handful of `alias` -es in your `.bashrc` or other shell init script that go to commonly-used locations.
 
-# Enter `goto` , a more flexible solution.
+## Enter `goto` , a more flexible solution.
 
 `goto`  is a context-sensitive set of shortcuts to your working directories. By context-sensitive, it means what it does depends on where your current directory is. You can configure a default working subdirectory (and any number of named alternates) for each of the projects you work on. Simply `cd` to anywhere in those projects, and type `goto` , and it brings you to that working directory.
 
-## Configuration
+### Configuration
 
 `goto` is configured by a simple plain text file in your home directory, `~/.goto.toml` . It uses the TOML format to express structure in an easy-to-read way. (TOML is a lot like the well-known “INI” format, but better defined and more flexible.)
 
@@ -53,11 +54,11 @@ So in this case, a common flow might be:
 
 A lot less typing.
 
-## Advanced Configuration
+### Advanced Configuration
 
 Contexts can overlap too! `goto` matches contexts from the most precise one first, out to the global context. A more-specific context can name shortcuts the same as less-specific ones, and they will override them. So `goto test` could bring you to project-wide UI tests in a project-wide context, but inside some sub-component’s directory, it could be configured to bring you to that component’s unit tests instead.
 
-# Installation
+## Installation
 
 Requirements:
 
@@ -76,7 +77,7 @@ To download, build, and install:
 
 Note that `goto` is meant to be used with your shell’s `eval` function, because that’s the only way to change your shell’s current directory. It prints `pushd <directory>`, which the shell must evaluate itself.
 
-# Future Plans
+## Future Plans
 1. Currently `goto` is very Unix-centric. It would be nice to make a Powershell or `cmd.exe` compatible version.
 2. ???
 

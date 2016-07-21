@@ -13,6 +13,8 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use docopt::Docopt;
 
+const CONFIG_FILENAME: &'static str = ".goto.toml";
+
 // 79 columns:
 // ----------------------------------------------------------------------------
 const USAGE: &'static str = r#"
@@ -21,13 +23,13 @@ Usage:
     goto (--help | --version)
 
 Configuration is stored in ~/.goto.toml, with the following format:
-    [global]
+
     name = "/some/path"             # 'goto name' takes you here
     othername = "~/some/other/path" # $HOME expansion will happen
 
     ["/somewhere/specific"]         # Only in effect when in this location:
     "*" = "default/under/specific"  # With no arguments, this is used.
-    "name" = "somewhere/else"       # Overshadows the one in [global]
+    "name" = "somewhere/else"       # Overshadows the one above.
 
 Relative paths under a context header are resolved relative to the path in that
 header. In the above example, when your current directory is under
@@ -45,16 +47,9 @@ struct Args {
     arg_name: Option<String>,
 }
 
-fn config_path() -> io::Result<PathBuf> {
-    match env::home_dir() {
-        Some(home) => Ok(home.join(".goto.toml")),
-        None => Err(io::Error::new(io::ErrorKind::Other, "unable to determine home directory")),
-    }
-}
-
-fn read_config() -> io::Result<toml::Table> {
+fn read_config(config_path: &Path) -> io::Result<toml::Table> {
     let mut config_text = String::new();
-    let mut file = try!(File::open(try!(config_path())));
+    let mut file = try!(File::open(config_path));
     try!(file.read_to_string(&mut config_text));
     let mut parser = toml::Parser::new(&config_text);
     let config = match parser.parse() {
@@ -103,7 +98,9 @@ fn parse_toml_as_path(t: &toml::Value, cwd: Option<&Path>) -> Result<PathBuf, St
     }
 }
 
-fn process_config(config_toml: toml::Table) -> Result<Configuration, String> {
+/// Process the parsed configuration TOML into goto's configuration struct.
+/// if `cwd` is specified, all relative paths will be interpreted relative to that path.
+fn process_config(config_toml: toml::Table, cwd: Option<&Path>) -> Result<Configuration, String> {
     let mut config = Configuration {
         global: PathMapping::new(),
         contexts: BTreeMap::new(),
@@ -111,38 +108,30 @@ fn process_config(config_toml: toml::Table) -> Result<Configuration, String> {
 
     for (k, v) in config_toml.into_iter() {
         if let toml::Value::Table(t) = v {
-            if k == "global" {
-                for (name, path) in t.into_iter() {
-                    match parse_toml_as_path(&path, None) {
-                        Ok(path) => { config.global.insert(name, path); },
-                        Err(msg) => { return Err(format!("error at global.{}: {}", name, msg)); },
-                    }
-                }
-            } else {
-                let context_path = match parse_toml_as_path(&toml::Value::String(k), None) {
+            // A path context.
+
+            let context_path = match parse_toml_as_path(&toml::Value::String(k), cwd) {
+                Ok(path) => path,
+                Err(msg) => { return Err(format!("error: {}", msg)); }
+            };
+
+            let mut context_map = PathMapping::new();
+
+            for (name, path) in t.into_iter() {
+                let mapped_path: PathBuf = match parse_toml_as_path(&path, Some(&context_path)) {
                     Ok(path) => path,
-                    Err(msg) => { return Err(format!("error: {}", msg)); }
+                    Err(msg) => {
+                        return Err(format!("error at {:?}.{}: {}", context_path, name, msg));
+                    }
                 };
 
-                let mut context_map = PathMapping::new();
-
-                for (name, path) in t.into_iter() {
-                    let mapped_path: PathBuf = match parse_toml_as_path(&path, Some(&context_path)) {
-                        Ok(path) => path,
-                        Err(msg) => {
-                            return Err(format!("error at {:?}.{}: {}", context_path, name, msg));
-                        }
-                    };
-
-                    context_map.insert(name, mapped_path);
-                }
-
-                config.contexts.insert(context_path, context_map);
+                context_map.insert(name, mapped_path);
             }
+
+            config.contexts.insert(context_path, context_map);
         } else {
-            // Attempt to parse any top-level entry (i.e. not under any header) as a path, and if
-            // it works, consider it to be a global entry.
-            match parse_toml_as_path(&v, None) {
+            // A top-level entry. Attempt to parse as a path and insert into the global table.
+            match parse_toml_as_path(&v, cwd) {
                 Ok(path) => { config.global.insert(k, path); },
                 Err(msg) => {
                     return Err(format!(
@@ -169,16 +158,20 @@ fn main() {
 
     let name = args.arg_name.unwrap_or("*".to_owned());
 
+    let home = env::home_dir().unwrap_or_else(|| {
+        panic!("unable to determine home directory");
+    });
+
     let cwd = PathBuf::from(env::current_dir().unwrap_or_else(|e| {
         panic!("unable to get current working directory: {}", e);
     }));
 
-    let config_toml = read_config().map_err(|e| {
-        panic!("failed to read configuration ~/.goto.toml: {}", e);
+    let config_toml = read_config(&home.join(Path::new(CONFIG_FILENAME))).map_err(|e| {
+        panic!("failed to read configuration ~/{}: {}", CONFIG_FILENAME, e);
     }).unwrap();
 
-    let config = process_config(config_toml).map_err(|msg| {
-        panic!("invalid configuration in ~/.goto.toml: {}", msg);
+    let config = process_config(config_toml, Some(&home)).map_err(|msg| {
+        panic!("invalid configuration in ~/{}: {}", CONFIG_FILENAME, msg);
     }).unwrap();
 
     let mut matched = false;

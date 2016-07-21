@@ -15,7 +15,7 @@ You open a terminal window, and get to work. But first you need to change direct
 
 Even if you remember exactly where it is in the tree you’re going, it’s a lot of typing, right?
 
- `cd ~/projects/current_project/src/com/example/thing/components/frobnicator/lib` 
+ `cd ~/projects/current_project/src/com/example/thing/components/frobnicator/lib`
 
 A common workaround is to set up a handful of `alias` -es in your `.bashrc` or other shell init script that go to commonly-used locations.
 
@@ -29,19 +29,18 @@ A common workaround is to set up a handful of `alias` -es in your `.bashrc` or o
 
 A sample:
 
-    [global]
     proj = "~/projects/current_project"
     dl = "~/downloads"
     pk = "~/packages"
-    
+
     ["~/projects/current_project"]
     "*" = "src/com/example/thing/components/frobnicator/lib"
     comps = "src/com/example/thing/components"
     test = "tests/thing"
 
-The `[global]` section defines a few named shortcuts. These are available from everywhere; simply `goto <name>` to invoke them.
+The top of the file defines a few named shortcuts. These are available from everywhere; simply `goto <name>` to invoke them.
 
-The second section defines a context. It’s only active when you’re in a subdirectory of the path given. It then defines some more shortcuts specific to that context. The `*` shortcut is special: it is the default, used when you don’t call `goto` with any arguments.
+The line in brackets begins a context. It’s only active when you’re in a subdirectory of the path given. It then defines some more shortcuts specific to that context. The `*` shortcut is special: it is the default, used when you don’t call `goto` with any arguments.
 
 The paths inside the context can be given relative to the path of the context itself.
 
@@ -67,11 +66,11 @@ Requirements:
 
 To download, build, and install:
 
-- `git clone https://github.com/wfraser/goto.git` 
-- `cd goto.git` 
-- `cargo build --release` 
-- `echo "function goto() { eval \$($(pwd)/target/release/goto \$*) }" >> ~/.bashrc` 
-- `. ~/.bashrc` 
+- `git clone https://github.com/wfraser/goto.git`
+- `cd goto.git`
+- `cargo build --release`
+- `echo "function goto() { eval \$($(pwd)/target/release/goto \$*) }" >> ~/.bashrc`
+- `. ~/.bashrc`
 
 (adjust the last two lines as needed to suit your shell)
 
@@ -80,4 +79,3 @@ Note that `goto` is meant to be used with your shell’s `eval` function, becaus
 ## Future Plans
 1. Currently `goto` is very Unix-centric. It would be nice to make a Powershell or `cmd.exe` compatible version.
 2. ???
-

@@ -1,6 +1,8 @@
 # `goto` – Working Directory Shortcuts
 
-You open a terminal window, and get to work. But first you need to change directories. If you work on a large project, you probably end up doing that a few times before you’re close to the thing you’re working on.
+You open a terminal window, and get to work. But first you need to change
+directories. If you work on a large project, you probably end up doing that a
+few times before you’re close to the thing you’re working on.
 
 
     $ cd projects/current_project/src/com/example/thing/components
@@ -13,19 +15,28 @@ You open a terminal window, and get to work. But first you need to change direct
     $ cd lib
     # etc.
 
-Even if you remember exactly where it is in the tree you’re going, it’s a lot of typing, right?
+Even if you remember exactly where it is in the tree you’re going, it’s a lot of
+typing, right?
 
  `cd ~/projects/current_project/src/com/example/thing/components/frobnicator/lib`
 
-A common workaround is to set up a handful of `alias` -es in your `.bashrc` or other shell init script that go to commonly-used locations.
+A common workaround is to set up a handful of `alias` -es in your `.bashrc` or
+other shell init script that go to commonly-used locations.
 
 ## Enter `goto` , a more flexible solution.
 
-`goto`  is a context-sensitive set of shortcuts to your working directories. By context-sensitive, it means what it does depends on where your current directory is. You can configure a default working subdirectory (and any number of named alternates) for each of the projects you work on. Simply `cd` to anywhere in those projects, and type `goto` , and it brings you to that working directory.
+`goto`  is a context-sensitive set of shortcuts to your working directories. By
+context-sensitive, it means what it does depends on where your current directory
+is. You can configure a default working subdirectory (and any number of named
+alternates) for each of the projects you work on. Simply `cd` to anywhere in
+those projects, and type `goto` , and it brings you to that working directory.
 
 ### Configuration
 
-`goto` is configured by a simple plain text file in your home directory, `~/.goto.toml` . It uses the TOML format to express structure in an easy-to-read way. (TOML is a lot like the well-known “INI” format, but better defined and more flexible.)
+`goto` is configured by a simple plain text file in your home directory,
+`~/.goto.toml` . It uses the TOML format to express structure in an easy-to-read
+way. (TOML is a lot like the well-known “INI” format, but better defined and
+more flexible.)
 
 A sample:
 
@@ -38,11 +49,16 @@ A sample:
     comps = "src/com/example/thing/components"
     test = "tests/thing"
 
-The top of the file defines a few named shortcuts. These are available from everywhere; simply `goto <name>` to invoke them.
+The top of the file defines a few named shortcuts. These are available from
+everywhere; simply `goto <name>` to invoke them.
 
-The line in brackets begins a context. It’s only active when you’re in a subdirectory of the path given. It then defines some more shortcuts specific to that context. The `*` shortcut is special: it is the default, used when you don’t call `goto` with any arguments.
+The line in brackets begins a context. It’s only active when you’re in a
+subdirectory of the path given. It then defines some more shortcuts specific to
+that context. The `*` shortcut is special: it is the default, used when you
+don’t call `goto` with any arguments.
 
-Paths are relative to your home directory, and the paths inside the context are relative to the path of the context itself.
+Paths are relative to your home directory, and the paths inside the context are
+relative to the path of the context itself.
 
 So in this case, a common flow might be:
 
@@ -55,7 +71,12 @@ A lot less typing.
 
 ### Advanced Configuration
 
-Contexts can overlap too! `goto` matches contexts from the most precise one first, out to the global context. A more-specific context can name shortcuts the same as less-specific ones, and they will override them. So `goto test` could bring you to project-wide UI tests in a project-wide context, but inside some sub-component’s directory, it could be configured to bring you to that component’s unit tests instead.
+Contexts can overlap too! `goto` matches contexts from the most precise one
+first, out to the global context. A more-specific context can name shortcuts the
+same as less-specific ones, and they will override them. So `goto test` could
+bring you to project-wide UI tests in a project-wide context, but inside some
+sub-component’s directory, it could be configured to bring you to that
+component’s unit tests instead.
 
 ## Installation
 
@@ -74,8 +95,9 @@ To download, build, and install:
 
 (adjust the last two lines as needed to suit your shell)
 
-Note that `goto` is meant to be used with your shell’s `eval` function, because that’s the only way to change your shell’s current directory. It prints `pushd <directory>`, which the shell must evaluate itself.
+Note that `goto` is meant to be used with your shell’s `eval` function, because
+that’s the only way to change your shell’s current directory. It prints `pushd
+<directory>`, which the shell must evaluate itself.
 
-## Future Plans
-1. Currently `goto` is very Unix-centric. It would be nice to make a Powershell or `cmd.exe` compatible version.
-2. ???
+## Future Plans 1. Currently `goto` is very Unix-centric. It would be nice to
+## make a Powershell or `cmd.exe` compatible version. 2. ???

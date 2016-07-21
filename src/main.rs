@@ -5,16 +5,21 @@ extern crate toml;
 use std::collections::btree_map::*;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use docopt::Docopt;
 
 const USAGE: &'static str = "
 Usage:
     goto [<name>]
-    goto --help
+    goto (--help | --version)
 
 Configuration is stored in ~/.goto.toml
+
+goto is meant to be used as the argument to your shell's 'eval' builtin, like so:
+    function goto() {
+        eval $(/usr/local/bin/goto $*)
+    }
 ";
 
 #[derive(Debug, RustcDecodable)]
@@ -92,7 +97,7 @@ fn process_config(config_toml: toml::Table) -> Result<Configuration, String> {
                 for (name, path) in t.into_iter() {
                     match parse_toml_as_path(path, None) {
                         Ok(path) => { config.global.insert(name, path); },
-                        Err(msg) => { return Err(format!("error at *.{}: {}", name, msg)); },
+                        Err(msg) => { return Err(format!("error at global.{}: {}", name, msg)); },
                     }
                 }
             } else {
@@ -126,8 +131,14 @@ fn process_config(config_toml: toml::Table) -> Result<Configuration, String> {
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.decode())
-                            .unwrap_or_else(|e| e.exit());
+                            .and_then(|d| {
+                                d.version(Some(format!("goto {}", env!("CARGO_PKG_VERSION"))))
+                                 .decode()
+                            })
+                            .unwrap_or_else(|e| {
+                                writeln!(io::stderr(), "{}", e).unwrap();
+                                ::std::process::exit(if e.fatal() { 1 } else { 0 });
+                            });
 
     let name = args.arg_name.unwrap_or("*".to_owned());
 
@@ -140,7 +151,7 @@ fn main() {
     }).unwrap();
 
     let config = process_config(config_toml).map_err(|msg| {
-        panic!("failed to parse configuration ~/.goto.toml: {}", msg);
+        panic!("invalid configuration in ~/.goto.toml: {}", msg);
     }).unwrap();
 
     let mut matched = false;
@@ -165,6 +176,6 @@ fn main() {
     }
 
     if !matched {
-        println!("echo not sure where to go");
+        writeln!(io::stderr(), "not sure where to go").unwrap();
     }
 }

@@ -83,14 +83,14 @@ struct Configuration {
 
 fn parse_toml_as_path(t: &toml::Value, cwd: Option<&Path>) -> Result<PathBuf, String> {
     if let &toml::Value::String(ref s) = t {
-        let path: PathBuf = if s.starts_with("~/") {
+        let path: PathBuf = if s.starts_with("~/") || s.starts_with("~\\") {
             env::home_dir().unwrap().join(&Path::new(&s[2..]))
-        } else if s.starts_with("/") {
-            PathBuf::from(s)
         } else if cwd.is_some() {
+            // note: this handles absolute paths correctly, i.e. by not using cwd at a all (except
+            // for Windows, where the drive letter of cwd is considered.)
             cwd.unwrap().join(Path::new(&s))
         } else {
-            return Err(format!("expected a path starting with \"/\" or \"~/\""));
+            return Err(format!("expected an absolute path"));
         };
         Ok(path)
     } else {

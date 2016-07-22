@@ -83,7 +83,6 @@ component’s unit tests instead.
 Requirements:
 
 1. rust compiler
-2. a Unix-based OS (Linux, Mac OS X, BSD, etc., but not Windows 😓)
 
 To download, build, and install:
 
@@ -98,6 +97,10 @@ To download, build, and install:
 Note that `goto` is meant to be used with your shell’s `eval` function, because
 that’s the only way to change your shell’s current directory. It prints
  `pushd <directory>`, which the shell must evaluate itself.
+
+Also note that unfortunately it's infeasible to support Windows' `cmd.exe` because
+it lacks an `eval` facility, and its string quoting rules are really bizarre.
+Powershell should work be easy to integrate with, though.
 
 ## Future Plans
 1. Add some testing around the .goto.toml configuration parser :)

@@ -169,17 +169,18 @@ fn main() {
     let home = env::home_dir().unwrap_or_else(|| {
         exit(format!("unable to determine home directory"), true);
     });
+    let config_path = home.join(Path::new(CONFIG_FILENAME));
 
     let cwd = PathBuf::from(env::current_dir().unwrap_or_else(|e| {
         exit(format!("unable to get current working directory: {}", e), true);
     }));
 
-    let config_toml = read_config(&home.join(Path::new(CONFIG_FILENAME))).map_err(|e| {
-        exit(format!("failed to read configuration ~/{}: {}", CONFIG_FILENAME, e), true);
+    let config_toml = read_config(&config_path).map_err(|e| {
+        exit(format!("failed to read configuration {:?}: {}", config_path, e), true);
     }).unwrap();
 
     let config = process_config(config_toml, Some(&home)).map_err(|msg| {
-        exit(format!("invalid configuration in ~/{}: {}", CONFIG_FILENAME, msg), true);
+        exit(format!("invalid configuration in {:?}: {}", config_path, msg), true);
     }).unwrap();
 
     let mut matched = false;

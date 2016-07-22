@@ -14,13 +14,17 @@ use std::path::{Path, PathBuf};
 use docopt::Docopt;
 
 const CONFIG_FILENAME: &'static str = ".goto.toml";
+const DEFAULT_SHELLCMD: &'static str = "pushd";
 
 // 79 columns:
 // ----------------------------------------------------------------------------
 const USAGE: &'static str = r#"
 Usage:
-    goto [<name>]
+    goto [options] [<name>]
     goto (--help | --version)
+
+Options:
+    -c <command>, --cmd=<command>   # defaults to 'pushd'
 
 Configuration is stored in ~/.goto.toml, with the following format:
 
@@ -45,6 +49,7 @@ goto is meant to be used as the argument to your shell's 'eval' builtin, like:
 #[derive(Debug, RustcDecodable)]
 struct Args {
     arg_name: Option<String>,
+    flag_cmd: Option<String>,
 }
 
 fn read_config(config_path: &Path) -> io::Result<toml::Table> {
@@ -154,16 +159,29 @@ fn exit(msg: String, fatal: bool) -> ! {
     ::std::process::exit(exit_code);
 }
 
+fn print_path(path: &Path, shellcmd: &str) {
+    if !shellcmd.is_empty() {
+        print!("{} ", shellcmd);
+    }
+
+    // Because the path is potentially combined with the current working directory, which is
+    // untrusted data, and the path is going to be evaluated by the shell, the path needs to be
+    // single-quote escaped to prevent any expansion, for security.
+    // (Otherwise a folder named '$(:(){:|:&};:)' would make for a bad day.)
+    println!("'{}'", path.to_str().unwrap().replace("'", "'\\''"));
+}
+
 fn main() {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| {
-                                d.version(Some(format!("goto {}", env!("CARGO_PKG_VERSION"))))
-                                 .decode()
-                            })
-                            .unwrap_or_else(|e| {
-                                exit(format!("{}", e), e.fatal());
-                            });
+        .and_then(|d| {
+            d.version(Some(format!("goto {}", env!("CARGO_PKG_VERSION"))))
+             .decode()
+        })
+        .unwrap_or_else(|e| {
+            exit(format!("{}", e), e.fatal());
+        });
 
+    let shellcmd = args.flag_cmd.unwrap_or(DEFAULT_SHELLCMD.to_owned());
     let name = args.arg_name.unwrap_or("*".to_owned());
 
     let home = env::home_dir().unwrap_or_else(|| {
@@ -190,7 +208,7 @@ fn main() {
         if cwd.starts_with(context_path) {
             let map = config.contexts.get(*context_path).unwrap();
             if let Some(path) = map.get(&name) {
-                println!("pushd {:?}", path);
+                print_path(path, &shellcmd);
                 matched = true;
                 break;
             }
@@ -199,7 +217,7 @@ fn main() {
 
     if !matched {
         if let Some(path) = config.global.get(&name) {
-            println!("pushd {:?}", path);
+            print_path(path, &shellcmd);
             matched = true;
         }
     }

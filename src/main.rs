@@ -20,7 +20,7 @@ const DEFAULT_SHELLCMD: &'static str = "pushd";
 // ----------------------------------------------------------------------------
 const USAGE: &'static str = r#"
 Usage:
-    goto [options] [<name>]
+    goto [options] [<name> [<extra>]]
     goto (--help | --version)
 
 Options:
@@ -40,6 +40,8 @@ header. In the above example, when your current directory is under
 /somewhere/specific, running 'goto name' takes you to
 /somewhere/specific/somewhere/else.
 
+If <extra> is provided as an extra argument, it is appended to the computed path.
+
 goto is meant to be used as the argument to your shell's 'eval' builtin, like:
     function goto() {
         eval $(/usr/local/bin/goto $*)  # or wherever the 'goto' binary is
@@ -49,6 +51,7 @@ goto is meant to be used as the argument to your shell's 'eval' builtin, like:
 #[derive(Debug, RustcDecodable)]
 struct Args {
     arg_name: Option<String>,
+    arg_extra: Option<String>,
     flag_cmd: Option<String>,
 }
 
@@ -159,7 +162,7 @@ fn exit(msg: &str, fatal: bool) -> ! {
     ::std::process::exit(exit_code);
 }
 
-fn print_path(path: &Path, shellcmd: &str) {
+fn print_path(path: &Path, shellcmd: &str, extra: &str) {
     if !shellcmd.is_empty() {
         print!("{} ", shellcmd);
     }
@@ -168,7 +171,7 @@ fn print_path(path: &Path, shellcmd: &str) {
     // untrusted data, and the path is going to be evaluated by the shell, the path needs to be
     // single-quote escaped to prevent any expansion, for security.
     // (Otherwise a folder named '$(:(){:|:&};:)' would make for a bad day.)
-    println!("'{}'", path.to_str().unwrap().replace("'", "'\\''"));
+    println!("'{}'", path.join(extra).to_str().unwrap().replace("'", "'\\''"));
 }
 
 fn main() {
@@ -183,6 +186,7 @@ fn main() {
 
     let shellcmd = args.flag_cmd.unwrap_or_else(|| DEFAULT_SHELLCMD.to_owned());
     let name = args.arg_name.unwrap_or_else(|| "*".to_owned());
+    let extra = args.arg_extra.unwrap_or_else(String::new);
 
     let home = env::home_dir().unwrap_or_else(|| {
         exit("unable to determine home directory", true);
@@ -208,7 +212,7 @@ fn main() {
         if cwd.starts_with(context_path) {
             let map = &config.contexts[*context_path];
             if let Some(path) = map.get(&name) {
-                print_path(path, &shellcmd);
+                print_path(path, &shellcmd, extra.as_ref());
                 matched = true;
                 break;
             }

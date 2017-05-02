@@ -1,6 +1,6 @@
 //! goto :: Flexible Working Directory Shortcuts
 //!
-//! Copyright (c) 2016 by William R. Fraser
+//! Copyright (c) 2016-2017 by William R. Fraser
 
 extern crate docopt;
 extern crate rustc_serialize;
@@ -21,6 +21,7 @@ const DEFAULT_SHELLCMD: &'static str = "pushd";
 const USAGE: &'static str = r#"
 Usage:
     goto [options] [<name> [<extra>]]
+    goto --list
     goto (--help | --version)
 
 Options:
@@ -53,6 +54,7 @@ struct Args {
     arg_name: Option<String>,
     arg_extra: Option<String>,
     flag_cmd: Option<String>,
+    flag_list: bool,
 }
 
 fn read_config(config_path: &Path) -> io::Result<toml::Table> {
@@ -205,28 +207,51 @@ fn main() {
         exit(&format!("invalid configuration in {:?}: {}", config_path, msg), true);
     }).unwrap();
 
-    let mut matched = false;
+    // only used for the --list mode
+    let mut effective_map = BTreeMap::<String, PathBuf>::new();
+
+    // Contexts can have keys that overlap with other contexts. The rule is that the longest
+    // context path that matches the CWD takes precedence.
+    let mut done = false;
     let mut context_paths_by_len: Vec<&PathBuf> = config.contexts.keys().collect();
     context_paths_by_len.sort_by_key(|p| p.as_os_str().len());
     for context_path in context_paths_by_len.iter().rev() {
         if cwd.starts_with(context_path) {
             let map = &config.contexts[*context_path];
-            if let Some(path) = map.get(&name) {
+            if args.flag_list {
+                for (k, v) in map {
+                    if let Entry::Vacant(entry) = effective_map.entry(k.clone()) {
+                        entry.insert(v.clone());
+                    }
+                }
+            } else if let Some(path) = map.get(&name) {
                 print_path(path, &shellcmd, extra.as_ref());
-                matched = true;
+                done = true;
                 break;
             }
         }
     }
 
-    if !matched {
+    if args.flag_list {
+        for (k, v) in &config.global {
+            if let Entry::Vacant(entry) = effective_map.entry(k.clone()) {
+                entry.insert(v.clone());
+            }
+        }
+        for (k, v) in effective_map {
+            writeln!(io::stderr(), "{} → {:?}", k, v).unwrap();
+        }
+        done = true;
+    }
+
+    if !done {
         if let Some(path) = config.global.get(&name) {
             print_path(path, &shellcmd, extra.as_ref());
-            matched = true;
+            done = true;
         }
     }
 
-    if !matched {
+    if !done {
         exit("not sure where to go", false);
     }
 }

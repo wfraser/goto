@@ -69,6 +69,9 @@ So in this case, a common flow might be:
 
 A lot less typing.
 
+You can also type `goto --list` to show the available shortcuts for your
+current working directory.
+
 ### Advanced Configuration
 
 Contexts can overlap too! `goto` matches contexts from the most precise one
@@ -87,7 +90,7 @@ Requirements:
 To download, build, and install:
 
 - `git clone https://github.com/wfraser/goto.git`
-- `cd goto.git`
+- `cd goto`
 - `cargo build --release`
 - `echo "function goto() { eval \$($(pwd)/target/release/goto \$*) }" >> ~/.bashrc`
 - `. ~/.bashrc`
@@ -97,6 +100,9 @@ To download, build, and install:
 Note that `goto` is meant to be used with your shell’s `eval` function, because
 that’s the only way to change your shell’s current directory. It prints
  `pushd <directory>`, which the shell must evaluate itself.
+
+You can customize the command goto prints (instead of `pushd`) by passing a
+`--cmd=<command>` argument.
 
 Also note that unfortunately it's infeasible to support Windows' `cmd.exe` because
 it lacks an `eval` facility, and its string quoting rules are really bizarre.

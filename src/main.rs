@@ -87,7 +87,7 @@ struct Configuration {
 }
 
 fn parse_toml_as_path(t: &toml::Value, cwd: Option<&Path>) -> Result<PathBuf, String> {
-    if let &toml::Value::String(ref s) = t {
+    if let toml::Value::String(ref s) = *t {
         let path: PathBuf = if s.starts_with("~/") || s.starts_with("~\\") {
             env::home_dir().unwrap().join(&Path::new(&s[2..]))
         } else if cwd.is_some() {
@@ -95,7 +95,7 @@ fn parse_toml_as_path(t: &toml::Value, cwd: Option<&Path>) -> Result<PathBuf, St
             // for Windows, where the drive letter of cwd is considered.)
             cwd.unwrap().join(Path::new(&s))
         } else {
-            return Err(format!("expected an absolute path"));
+            return Err("expected an absolute path".into());
         };
         Ok(path)
     } else {
@@ -111,7 +111,7 @@ fn process_config(config_toml: toml::Table, cwd: Option<&Path>) -> Result<Config
         contexts: BTreeMap::new(),
     };
 
-    for (k, v) in config_toml.into_iter() {
+    for (k, v) in config_toml {
         if let toml::Value::Table(t) = v {
             // A path context.
 
@@ -122,7 +122,7 @@ fn process_config(config_toml: toml::Table, cwd: Option<&Path>) -> Result<Config
 
             let mut context_map = PathMapping::new();
 
-            for (name, path) in t.into_iter() {
+            for (name, path) in t {
                 let mapped_path: PathBuf = match parse_toml_as_path(&path, Some(&context_path)) {
                     Ok(path) => path,
                     Err(msg) => {
@@ -150,9 +150,9 @@ fn process_config(config_toml: toml::Table, cwd: Option<&Path>) -> Result<Config
     Ok(config)
 }
 
-fn exit(msg: String, fatal: bool) -> ! {
+fn exit(msg: &str, fatal: bool) -> ! {
     io::stderr().write_all(msg.as_bytes()).unwrap();
-    if !msg.ends_with("\n") {
+    if !msg.ends_with('\n') {
         io::stderr().write_all(b"\n").unwrap();
     }
     let exit_code = if fatal { 1 } else { 0 };
@@ -178,27 +178,27 @@ fn main() {
              .decode()
         })
         .unwrap_or_else(|e| {
-            exit(format!("{}", e), e.fatal());
+            exit(&format!("{}", e), e.fatal());
         });
 
-    let shellcmd = args.flag_cmd.unwrap_or(DEFAULT_SHELLCMD.to_owned());
-    let name = args.arg_name.unwrap_or("*".to_owned());
+    let shellcmd = args.flag_cmd.unwrap_or_else(|| DEFAULT_SHELLCMD.to_owned());
+    let name = args.arg_name.unwrap_or_else(|| "*".to_owned());
 
     let home = env::home_dir().unwrap_or_else(|| {
-        exit(format!("unable to determine home directory"), true);
+        exit("unable to determine home directory", true);
     });
     let config_path = home.join(Path::new(CONFIG_FILENAME));
 
     let cwd = PathBuf::from(env::current_dir().unwrap_or_else(|e| {
-        exit(format!("unable to get current working directory: {}", e), true);
+        exit(&format!("unable to get current working directory: {}", e), true);
     }));
 
     let config_toml = read_config(&config_path).map_err(|e| {
-        exit(format!("failed to read configuration {:?}: {}", config_path, e), true);
+        exit(&format!("failed to read configuration {:?}: {}", config_path, e), true);
     }).unwrap();
 
     let config = process_config(config_toml, Some(&home)).map_err(|msg| {
-        exit(format!("invalid configuration in {:?}: {}", config_path, msg), true);
+        exit(&format!("invalid configuration in {:?}: {}", config_path, msg), true);
     }).unwrap();
 
     let mut matched = false;
@@ -206,7 +206,7 @@ fn main() {
     context_paths_by_len.sort_by_key(|p| p.as_os_str().len());
     for context_path in context_paths_by_len.iter().rev() {
         if cwd.starts_with(context_path) {
-            let map = config.contexts.get(*context_path).unwrap();
+            let map = &config.contexts[*context_path];
             if let Some(path) = map.get(&name) {
                 print_path(path, &shellcmd);
                 matched = true;
@@ -217,12 +217,12 @@ fn main() {
 
     if !matched {
         if let Some(path) = config.global.get(&name) {
-            print_path(path, &shellcmd);
+            print_path(path, &shellcmd, extra.as_ref());
             matched = true;
         }
     }
 
     if !matched {
-        exit(format!("not sure where to go"), false);
+        exit("not sure where to go", false);
     }
 }

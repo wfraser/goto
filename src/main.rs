@@ -4,7 +4,8 @@
 
 extern crate dirs;
 extern crate docopt;
-extern crate rustc_serialize;
+extern crate serde;
+#[macro_use] extern crate serde_derive;
 extern crate toml;
 
 use std::collections::btree_map::*;
@@ -55,7 +56,7 @@ goto is meant to be used as the argument to your shell's 'eval' builtin, like:
     }
 "#;
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     arg_name: Option<String>,
     arg_extra: Option<String>,
@@ -252,7 +253,7 @@ fn main() {
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| {
             d.version(Some(format!("goto {}", env!("CARGO_PKG_VERSION"))))
-             .decode()
+             .deserialize()
         })
         .unwrap_or_else(|e| {
             exit(&format!("{}", e), e.fatal());

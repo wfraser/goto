@@ -42,6 +42,11 @@ header. In the above example, when your current directory is under
 /somewhere/specific, running 'goto name' takes you to
 /somewhere/specific/somewhere/else.
 
+Configuration files can also be placed in any directory and will affect any
+invocations of goto from that directory or below it. In the case of conflicts,
+configurations from farther down the tree take precedence, and the one in your
+home directory takes precedence over all others.
+
 If <extra> is provided as an extra argument, it is appended to the computed path.
 
 goto is meant to be used as the argument to your shell's 'eval' builtin, like:
@@ -90,16 +95,26 @@ struct Configuration {
     contexts: BTreeMap<PathBuf, PathMapping>,
 }
 
-fn parse_toml_as_path(t: &toml::Value, cwd: Option<&Path>) -> Result<PathBuf, String> {
+impl Default for Configuration {
+    fn default() -> Self {
+        Configuration {
+            global: PathMapping::new(),
+            contexts: BTreeMap::new(),
+        }
+    }
+}
+
+/// Make the given TOML value into an absolute path. It should be a string, otherwise an error is
+/// returned. If the path is relative, it is made absolute by interpreting it relative to the given
+/// path, or to the user's home directory if it starts with "~/".
+fn parse_toml_as_path(t: &toml::Value, relative_to: &Path) -> Result<PathBuf, String> {
     if let toml::Value::String(ref s) = *t {
         let path: PathBuf = if s.starts_with("~/") || s.starts_with("~\\") {
-            env::home_dir().unwrap().join(&Path::new(&s[2..]))
-        } else if cwd.is_some() {
-            // note: this handles absolute paths correctly, i.e. by not using cwd at a all (except
-            // for Windows, where the drive letter of cwd is considered.)
-            cwd.unwrap().join(Path::new(&s))
+            dirs::home_dir().unwrap().join(&Path::new(&s[2..]))
         } else {
-            return Err("expected an absolute path".into());
+            // note: this handles absolute paths correctly, by not using `relative_to` at all
+            // (except for Windows, where the drive letter of `relative_to` may be considered).
+            relative_to.join(Path::new(&s))
         };
         Ok(path)
     } else {
@@ -108,18 +123,15 @@ fn parse_toml_as_path(t: &toml::Value, cwd: Option<&Path>) -> Result<PathBuf, St
 }
 
 /// Process the parsed configuration TOML into goto's configuration struct.
-/// if `cwd` is specified, all relative paths will be interpreted relative to that path.
-fn process_config(config_toml: toml::Table, cwd: Option<&Path>) -> Result<Configuration, String> {
-    let mut config = Configuration {
-        global: PathMapping::new(),
-        contexts: BTreeMap::new(),
-    };
+/// All relative paths will be interpreted relative to `relative_to`.
+fn process_config(config_toml: toml::Table, relative_to: &Path) -> Result<Configuration, String> {
+    let mut config = Configuration::default();
 
     for (k, v) in config_toml {
         if let toml::Value::Table(t) = v {
             // A path context.
 
-            let context_path = match parse_toml_as_path(&toml::Value::String(k), cwd) {
+            let context_path = match parse_toml_as_path(&toml::Value::String(k), relative_to) {
                 Ok(path) => path,
                 Err(msg) => { return Err(format!("error: {}", msg)); }
             };
@@ -127,7 +139,7 @@ fn process_config(config_toml: toml::Table, cwd: Option<&Path>) -> Result<Config
             let mut context_map = PathMapping::new();
 
             for (name, path) in t {
-                let mapped_path: PathBuf = match parse_toml_as_path(&path, Some(&context_path)) {
+                let mapped_path: PathBuf = match parse_toml_as_path(&path, &context_path) {
                     Ok(path) => path,
                     Err(msg) => {
                         return Err(format!("error at {:?}.{}: {}", context_path, name, msg));
@@ -140,7 +152,7 @@ fn process_config(config_toml: toml::Table, cwd: Option<&Path>) -> Result<Config
             config.contexts.insert(context_path, context_map);
         } else {
             // A top-level entry. Attempt to parse as a path and insert into the global table.
-            match parse_toml_as_path(&v, cwd) {
+            match parse_toml_as_path(&v, relative_to) {
                 Ok(path) => { config.global.insert(k, path); },
                 Err(msg) => {
                     return Err(format!(
@@ -152,6 +164,67 @@ fn process_config(config_toml: toml::Table, cwd: Option<&Path>) -> Result<Config
     }
 
     Ok(config)
+}
+
+/// Combine two configurations. The entries in `overlay` take precedence.
+fn combine_configs(combined: &mut Configuration, mut overlay: Configuration) {
+    combined.global.append(&mut overlay.global);
+    for (context_path, mut context) in overlay.contexts {
+        match combined.contexts.entry(context_path) {
+            Entry::Occupied(mut combined_context) => {
+                combined_context.get_mut().append(&mut context);
+            },
+            Entry::Vacant(entry) => {
+                entry.insert(context);
+            }
+        }
+    }
+}
+
+/// Read the configuration file at the given path.
+/// If the file does not exist, returns Ok(None), otherwise if the file cannot be read or processed
+/// for any reason, returns a message explaining the error.
+fn read_config(config_path: &Path) -> Result<Option<Configuration>, String> {
+    let config_toml = match read_config_toml(config_path) {
+        Ok(toml) => toml,
+        Err(ref e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(format!("failed to read configuration {:?}: {}", config_path, e)),
+    };
+
+    process_config(config_toml, config_path.parent().unwrap()).map_err(|msg| {
+        format!("invalid configuration in {:?}: {}", config_path, msg)
+    }).map(Some)
+}
+
+/// Read and combine all configuration files for a given path, by walking up the directory stack
+/// from the root to `cwd`, and finally the user's home configuration. If reading any of them
+/// fails (other than because the file does not exist), returns an appropriate error message.
+fn read_combine_configs(home_config_path: &Path, cwd: &Path) -> Result<Configuration, String> {
+    assert!(cwd.is_absolute());
+
+    let mut combined = Configuration::default();
+
+    // Accumulate paths by stripping off components until we hit the root.
+    let mut search_paths = Vec::<&Path>::new();
+    let mut maybe_path = Some(cwd);
+    while let Some(path) = maybe_path {
+        search_paths.push(path);
+        maybe_path = path.parent();
+    }
+
+    // Walk from the root up to `cwd`, reading and combining configs if they exist.
+    for path in search_paths.iter().rev() {
+        let toml_path = path.join(CONFIG_FILENAME);
+        if let Some(config) = read_config(&toml_path)? {
+            combine_configs(&mut combined, config);
+        }
+    }
+
+    if let Some(config) = read_config(home_config_path)? {
+        combine_configs(&mut combined, config);
+    }
+
+    Ok(combined)
 }
 
 fn exit(msg: &str, fatal: bool) -> ! {
@@ -198,9 +271,9 @@ fn main() {
         exit(&format!("unable to get current working directory: {}", e), true);
     });
 
-    let config = process_config(config_toml, Some(&home)).map_err(|msg| {
-        exit(&format!("invalid configuration in {:?}: {}", config_path, msg), true);
-    }).unwrap();
+    let config = read_combine_configs(&config_path, &cwd).unwrap_or_else(|msg| {
+        exit(&msg, true);
+    });
 
     // only used for the --list mode
     let mut effective_map = BTreeMap::<String, PathBuf>::new();

@@ -64,26 +64,14 @@ struct Args {
     flag_list: bool,
 }
 
-fn read_config_toml(config_path: &Path) -> io::Result<toml::Table> {
+fn read_config_toml(config_path: &Path) -> io::Result<toml::value::Table> {
     let mut config_text = String::new();
     let mut file = File::open(config_path)?;
     file.read_to_string(&mut config_text)?;
-    let mut parser = toml::Parser::new(&config_text);
-    match parser.parse() {
-        Some(config) => Ok(config),
-        None => {
-            let mut msg = String::from("failed to parse TOML:");
-            for err in &parser.errors {
-                let linecol_lo = parser.to_linecol(err.lo);
-                let linecol_hi = parser.to_linecol(err.hi);
-                msg.push_str(&format!("\n\t{} at {}:{} to {}:{}",
-                        err.desc,
-                        linecol_lo.0 + 1,
-                        linecol_lo.1 + 1,
-                        linecol_hi.0 + 1,
-                        linecol_hi.1 + 1));
-            }
-            Err(io::Error::new(io::ErrorKind::Other, msg))
+    match toml::from_str(&config_text) {
+        Ok(config) => Ok(config),
+        Err(e) => {
+            Err(io::Error::new(io::ErrorKind::Other, format!("failed to parse TOML: {}", e)))
         }
     }
 }
@@ -125,7 +113,9 @@ fn parse_toml_as_path(t: &toml::Value, relative_to: &Path) -> Result<PathBuf, St
 
 /// Process the parsed configuration TOML into goto's configuration struct.
 /// All relative paths will be interpreted relative to `relative_to`.
-fn process_config(config_toml: toml::Table, relative_to: &Path) -> Result<Configuration, String> {
+fn process_config(config_toml: toml::value::Table, relative_to: &Path)
+    -> Result<Configuration, String>
+{
     let mut config = Configuration::default();
 
     for (k, v) in config_toml {

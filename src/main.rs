@@ -2,6 +2,7 @@
 //!
 //! Copyright (c) 2016-2017 by William R. Fraser
 
+extern crate dirs;
 extern crate docopt;
 extern crate rustc_serialize;
 extern crate toml;
@@ -13,12 +14,12 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use docopt::Docopt;
 
-const CONFIG_FILENAME: &'static str = ".goto.toml";
-const DEFAULT_SHELLCMD: &'static str = "pushd";
+const CONFIG_FILENAME: &str = ".goto.toml";
+const DEFAULT_SHELLCMD: &str = "pushd";
 
 // 79 columns:
 // ----------------------------------------------------------------------------
-const USAGE: &'static str = r#"
+const USAGE: &str = r#"
 Usage:
     goto [options] [<name> [<extra>]]
     goto --list
@@ -57,13 +58,13 @@ struct Args {
     flag_list: bool,
 }
 
-fn read_config(config_path: &Path) -> io::Result<toml::Table> {
+fn read_config_toml(config_path: &Path) -> io::Result<toml::Table> {
     let mut config_text = String::new();
-    let mut file = try!(File::open(config_path));
-    try!(file.read_to_string(&mut config_text));
+    let mut file = File::open(config_path)?;
+    file.read_to_string(&mut config_text)?;
     let mut parser = toml::Parser::new(&config_text);
-    let config = match parser.parse() {
-        Some(v) => v,
+    match parser.parse() {
+        Some(config) => Ok(config),
         None => {
             let mut msg = String::from("failed to parse TOML:");
             for err in &parser.errors {
@@ -76,11 +77,9 @@ fn read_config(config_path: &Path) -> io::Result<toml::Table> {
                         linecol_hi.0 + 1,
                         linecol_hi.1 + 1));
             }
-            return Err(io::Error::new(io::ErrorKind::Other, msg));
+            Err(io::Error::new(io::ErrorKind::Other, msg))
         }
-    };
-
-    Ok(config)
+    }
 }
 
 type PathMapping = BTreeMap<String, PathBuf>;
@@ -186,22 +185,18 @@ fn main() {
             exit(&format!("{}", e), e.fatal());
         });
 
-    let shellcmd = args.flag_cmd.unwrap_or_else(|| DEFAULT_SHELLCMD.to_owned());
-    let name = args.arg_name.unwrap_or_else(|| "*".to_owned());
-    let extra = args.arg_extra.unwrap_or_else(String::new);
+    let shellcmd = args.flag_cmd.as_ref().map(|s| s.as_str()).unwrap_or(DEFAULT_SHELLCMD);
+    let name = args.arg_name.as_ref().map(|s| s.as_str()).unwrap_or("*");
+    let extra = args.arg_extra.as_ref().map(|s| s.as_str()).unwrap_or("");
 
-    let home = env::home_dir().unwrap_or_else(|| {
+    let home = dirs::home_dir().unwrap_or_else(|| {
         exit("unable to determine home directory", true);
     });
     let config_path = home.join(Path::new(CONFIG_FILENAME));
 
-    let cwd = PathBuf::from(env::current_dir().unwrap_or_else(|e| {
+    let cwd = env::current_dir().unwrap_or_else(|e| {
         exit(&format!("unable to get current working directory: {}", e), true);
-    }));
-
-    let config_toml = read_config(&config_path).map_err(|e| {
-        exit(&format!("failed to read configuration {:?}: {}", config_path, e), true);
-    }).unwrap();
+    });
 
     let config = process_config(config_toml, Some(&home)).map_err(|msg| {
         exit(&format!("invalid configuration in {:?}: {}", config_path, msg), true);
@@ -224,8 +219,8 @@ fn main() {
                         entry.insert(v.clone());
                     }
                 }
-            } else if let Some(path) = map.get(&name) {
-                print_path(path, &shellcmd, extra.as_ref());
+            } else if let Some(path) = map.get(&*name) {
+                print_path(path, shellcmd, extra);
                 done = true;
                 break;
             }
@@ -239,14 +234,14 @@ fn main() {
             }
         }
         for (k, v) in effective_map {
-            writeln!(io::stderr(), "{} → {:?}", k, v).unwrap();
+            eprintln!("{} → {:?}", k, v);
         }
         done = true;
     }
 
     if !done {
-        if let Some(path) = config.global.get(&name) {
-            print_path(path, &shellcmd, extra.as_ref());
+        if let Some(path) = config.global.get(&*name) {
+            print_path(path, shellcmd, extra);
             done = true;
         }
     }

@@ -4,6 +4,7 @@ version = "2.2.0"
 authors = ["Bill Fraser <wfraser@codewise.org>"]
 
 [dependencies]
+dirs = "1"
 docopt = "0.6"
 rustc-serialize = "0.3"
 toml = "0.1"

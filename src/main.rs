@@ -76,7 +76,13 @@ fn read_config_toml(config_path: &Path) -> io::Result<toml::value::Table> {
     }
 }
 
-type PathMapping = BTreeMap<String, PathBuf>;
+type PathMapping = BTreeMap<String, PathMappingEntry>;
+
+#[derive(Debug, Clone)]
+struct PathMappingEntry {
+    dest: PathBuf,
+    source_file: PathBuf,
+}
 
 #[derive(Debug)]
 struct Configuration {
@@ -113,7 +119,7 @@ fn parse_toml_as_path(t: &toml::Value, relative_to: &Path) -> Result<PathBuf, St
 
 /// Process the parsed configuration TOML into goto's configuration struct.
 /// All relative paths will be interpreted relative to `relative_to`.
-fn process_config(config_toml: toml::value::Table, relative_to: &Path)
+fn process_config(config_file_path: &Path, config_toml: toml::value::Table, relative_to: &Path)
     -> Result<Configuration, String>
 {
     let mut config = Configuration::default();
@@ -137,20 +143,28 @@ fn process_config(config_toml: toml::value::Table, relative_to: &Path)
                     }
                 };
 
-                context_map.insert(name, mapped_path);
+                context_map.insert(name, PathMappingEntry {
+                    source_file: config_file_path.to_owned(),
+                    dest: mapped_path,
+                });
             }
 
             config.contexts.insert(context_path, context_map);
         } else {
             // A top-level entry. Attempt to parse as a path and insert into the global table.
-            match parse_toml_as_path(&v, relative_to) {
-                Ok(path) => { config.global.insert(k, path); },
+            let mapped_path: PathBuf = match parse_toml_as_path(&v, relative_to) {
+                Ok(path) => path,
                 Err(msg) => {
                     return Err(format!(
                         "error at {}: expected a table or a path string, not {} ({})",
                          k, v.type_str(), msg));
                 },
-            }
+            };
+
+            config.global.insert(k, PathMappingEntry {
+                source_file: config_file_path.to_owned(),
+                dest: mapped_path,
+            });
         }
     }
 
@@ -182,9 +196,11 @@ fn read_config(config_path: &Path) -> Result<Option<Configuration>, String> {
         Err(e) => return Err(format!("failed to read configuration {:?}: {}", config_path, e)),
     };
 
-    process_config(config_toml, config_path.parent().unwrap()).map_err(|msg| {
-        format!("invalid configuration in {:?}: {}", config_path, msg)
-    }).map(Some)
+    process_config(config_path, config_toml, config_path.parent().unwrap())
+        .map_err(|msg| {
+            format!("invalid configuration in {:?}: {}", config_path, msg)
+        })
+        .map(Some)
 }
 
 /// Read and combine all configuration files for a given path, by walking up the directory stack
@@ -267,7 +283,7 @@ fn main() {
     });
 
     // only used for the --list mode
-    let mut effective_map = BTreeMap::<String, PathBuf>::new();
+    let mut effective_map = PathMapping::new();
 
     // Contexts can have keys that overlap with other contexts. The rule is that the longest
     // context path that matches the CWD takes precedence.
@@ -283,8 +299,8 @@ fn main() {
                         entry.insert(v.clone());
                     }
                 }
-            } else if let Some(path) = map.get(&*name) {
-                print_path(path, shellcmd, extra);
+            } else if let Some(ref entry) = map.get(&*name) {
+                print_path(&entry.dest, shellcmd, extra);
                 done = true;
                 break;
             }
@@ -292,20 +308,18 @@ fn main() {
     }
 
     if args.flag_list {
-        for (k, v) in &config.global {
-            if let Entry::Vacant(entry) = effective_map.entry(k.clone()) {
-                entry.insert(v.clone());
+        for (k, v) in config.global {
+            if let Entry::Vacant(entry) = effective_map.entry(k) {
+                entry.insert(v);
             }
         }
         for (k, v) in effective_map {
-            eprintln!("{} → {:?}", k, v);
+            eprintln!("{} → {:?} (from {:?})", k, v.dest, v.source_file);
         }
         done = true;
-    }
-
-    if !done {
-        if let Some(path) = config.global.get(&*name) {
-            print_path(path, shellcmd, extra);
+    } else if !done {
+        if let Some(ref entry) = config.global.get(&*name) {
+            print_path(&entry.dest, shellcmd, extra);
             done = true;
         }
     }

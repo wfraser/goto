@@ -1,12 +1,8 @@
 //! goto :: Flexible Working Directory Shortcuts
 //!
-//! Copyright (c) 2016-2017 by William R. Fraser
+//! Copyright (c) 2016-2019 by William R. Fraser
 
-extern crate dirs;
-extern crate docopt;
-extern crate serde;
 #[macro_use] extern crate serde_derive;
-extern crate toml;
 
 use std::collections::btree_map::*;
 use std::env;

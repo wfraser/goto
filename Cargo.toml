@@ -2,9 +2,10 @@
 name = "goto"
 version = "2.4.0"
 authors = ["Bill Fraser <wfraser@codewise.org>"]
+edition = "2018"
 
 [dependencies]
-dirs = "1"
+dirs = "2"
 docopt = "1"
 serde = "1"
 serde_derive = "1"

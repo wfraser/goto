@@ -80,19 +80,10 @@ struct PathMappingEntry {
     source_file: PathBuf,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Configuration {
     global: PathMapping,
     contexts: BTreeMap<PathBuf, PathMapping>,
-}
-
-impl Default for Configuration {
-    fn default() -> Self {
-        Configuration {
-            global: PathMapping::new(),
-            contexts: BTreeMap::new(),
-        }
-    }
 }
 
 /// Make the given TOML value into an absolute path. It should be a string, otherwise an error is
@@ -248,7 +239,7 @@ fn print_path(path: &Path, shellcmd: &str, extra: &str) {
     // untrusted data, and the path is going to be evaluated by the shell, the path needs to be
     // single-quote escaped to prevent any expansion, for security.
     // (Otherwise a folder named '$(:(){:|:&};:)' would make for a bad day.)
-    println!("'{}'", path.join(extra).to_str().unwrap().replace("'", "'\\''"));
+    println!("'{}'", path.join(extra).to_str().unwrap().replace('\'', "'\\''"));
 }
 
 fn main() {
@@ -261,9 +252,9 @@ fn main() {
             exit(&format!("{}", e), e.fatal());
         });
 
-    let shellcmd = args.flag_cmd.as_ref().map(|s| s.as_str()).unwrap_or(DEFAULT_SHELLCMD);
-    let name = args.arg_name.as_ref().map(|s| s.as_str()).unwrap_or("*");
-    let extra = args.arg_extra.as_ref().map(|s| s.as_str()).unwrap_or("");
+    let shellcmd = args.flag_cmd.as_deref().unwrap_or(DEFAULT_SHELLCMD);
+    let name = args.arg_name.as_deref().unwrap_or("*");
+    let extra = args.arg_extra.as_deref().unwrap_or("");
 
     let home = dirs::home_dir().unwrap_or_else(|| {
         exit("unable to determine home directory", true);
@@ -295,7 +286,7 @@ fn main() {
                         entry.insert(v.clone());
                     }
                 }
-            } else if let Some(ref entry) = map.get(&*name) {
+            } else if let Some(entry) = map.get(&*name) {
                 print_path(&entry.dest, shellcmd, extra);
                 done = true;
                 break;
@@ -314,7 +305,7 @@ fn main() {
         }
         done = true;
     } else if !done {
-        if let Some(ref entry) = config.global.get(&*name) {
+        if let Some(entry) = config.global.get(&*name) {
             print_path(&entry.dest, shellcmd, extra);
             done = true;
         }

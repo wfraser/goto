@@ -5,7 +5,7 @@ authors = ["Bill Fraser <wfraser@codewise.org>"]
 edition = "2018"
 
 [dependencies]
-dirs = "2"
+dirs = "4"
 docopt = "1"
 serde = "1"
 serde_derive = "1"

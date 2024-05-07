@@ -1,6 +1,6 @@
 //! goto :: Flexible Working Directory Shortcuts
 //!
-//! Copyright (c) 2016-2019 by William R. Fraser
+//! Copyright (c) 2016-2024 by William R. Fraser
 
 use std::collections::btree_map::*;
 use std::env;

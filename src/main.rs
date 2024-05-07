@@ -91,7 +91,7 @@ struct Configuration {
 fn parse_toml_as_path(t: &toml::Value, relative_to: &Path) -> Result<PathBuf, String> {
     if let toml::Value::String(ref s) = *t {
         let path: PathBuf = if s.starts_with("~/") || s.starts_with("~\\") {
-            dirs::home_dir().unwrap().join(&Path::new(&s[2..]))
+            dirs::home_dir().unwrap().join(Path::new(&s[2..]))
         } else {
             // note: this handles absolute paths correctly, by not using `relative_to` at all
             // (except for Windows, where the drive letter of `relative_to` may be considered).
@@ -285,7 +285,7 @@ fn main() {
                         entry.insert(v.clone());
                     }
                 }
-            } else if let Some(entry) = map.get(&*name) {
+            } else if let Some(entry) = map.get(name) {
                 print_path(&entry.dest, shellcmd, extra);
                 done = true;
                 break;
@@ -304,7 +304,7 @@ fn main() {
         }
         done = true;
     } else if !done {
-        if let Some(entry) = config.global.get(&*name) {
+        if let Some(entry) = config.global.get(name) {
             print_path(&entry.dest, shellcmd, extra);
             done = true;
         }

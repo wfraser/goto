@@ -2,14 +2,13 @@
 //!
 //! Copyright (c) 2016-2019 by William R. Fraser
 
-#[macro_use] extern crate serde_derive;
-
 use std::collections::btree_map::*;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use docopt::Docopt;
+use serde::Deserialize;
 
 const CONFIG_FILENAME: &str = ".goto.toml";
 const DEFAULT_SHELLCMD: &str = "pushd";

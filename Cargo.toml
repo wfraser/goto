@@ -1,11 +1,10 @@
 [package]
 name = "goto"
-version = "2.4.1"
+version = "2.4.2"
 authors = ["Bill Fraser <wfraser@codewise.org>"]
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.5.16", features = ["derive"] }
 dirs = "5"
-docopt = "1"
-serde = { version = "1", features = ["derive"] }
 toml = "0.8"

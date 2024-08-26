@@ -7,56 +7,63 @@ use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use docopt::Docopt;
-use serde::Deserialize;
+use clap::Parser;
 
 const CONFIG_FILENAME: &str = ".goto.toml";
-const DEFAULT_SHELLCMD: &str = "pushd";
 
-// 79 columns:
-// ----------------------------------------------------------------------------
-const USAGE: &str = r#"
-Usage:
-    goto [options] [<name> [<extra>]]
-    goto --list
-    goto (--help | --version)
+//  79 columns:
+//  ----------------------------------------------------------------------------
 
-Options:
-    -c <command>, --cmd=<command>   # defaults to 'pushd'
-
-Configuration is stored in ~/.goto.toml, with the following format:
-
-    name = "/some/path"             # 'goto name' takes you here
-    othername = "~/some/other/path" # $HOME expansion will happen
-
-    ["/somewhere/specific"]         # Only in effect when in this location:
-    "*" = "default/under/specific"  # With no arguments, this is used.
-    "name" = "somewhere/else"       # Overshadows the one above.
-
-Relative paths under a context header are resolved relative to the path in that
-header. In the above example, when your current directory is under
-/somewhere/specific, running 'goto name' takes you to
-/somewhere/specific/somewhere/else.
-
-Configuration files can also be placed in any directory and will affect any
-invocations of goto from that directory or below it. In the case of conflicts,
-configurations from farther down the tree take precedence, and the one in your
-home directory takes precedence over all others.
-
-If <extra> is provided as an extra argument, it is appended to the computed path.
-
-goto is meant to be used as the argument to your shell's 'eval' builtin, like:
-    function goto() {
-        eval $(/usr/local/bin/goto $*)  # or wherever the 'goto' binary is
-    }
-"#;
-
-#[derive(Debug, Deserialize)]
+/// goto :: Flexible Working Directory Shortcuts
+///
+/// Configuration is stored in ~/.goto.toml, with the following format:
+///
+///     name = "/some/path"             # 'goto name' takes you here
+///     othername = "~/some/other/path" # $HOME expansion will happen
+///
+///     ["/somewhere/specific"]         # Only in effect when in this location:
+///     "*" = "default/under/specific"  # With no arguments, this is used.
+///     "name" = "somewhere/else"       # Overshadows the one above.
+///
+/// Relative paths under a context header are resolved relative to the path in
+/// that header. In the above example, when your current directory is under
+/// /somewhere/specific, running 'goto name' takes you to
+/// /somewhere/specific/somewhere/else.
+///
+/// Configuration files can also be placed in any directory and will affect any
+/// invocations of goto from that directory or below it. In the case of
+/// conflicts, configurations from farther down the tree take precedence, and
+/// the one in your home directory takes precedence over all others.
+///
+/// If <extra> is provided as an extra argument, it is appended to the computed
+/// path.
+///
+/// goto is meant to be used as the argument to your shell's 'eval' builtin,
+/// like:
+///     function goto() {
+///         eval $(/usr/local/bin/goto $*)  # or wherever the 'goto' binary is
+///     }
+#[derive(Parser, Debug)]
+#[clap(version, verbatim_doc_comment)]
 struct Args {
-    arg_name: Option<String>,
-    arg_extra: Option<String>,
-    flag_cmd: Option<String>,
-    flag_list: bool,
+    /// The command to output to change directory.
+    #[arg(short, long="cmd", default_value="pushd")]
+    command: String,
+
+    /// List the currently available shortcuts.
+    #[arg(short, long)]
+    list: bool,
+
+    /// Name of the shortcut to change directory to.
+    #[arg(
+        default_value_if("list", "true", Some("")),
+        required(false),
+        required_unless_present("list"),
+    )]
+    name: String,
+
+    /// Optional subpath to be appended to the shortcut's path.
+    extra: Option<String>,
 }
 
 fn read_config_toml(config_path: &Path) -> io::Result<toml::value::Table> {
@@ -242,18 +249,9 @@ fn print_path(path: &Path, shellcmd: &str, extra: &str) {
 }
 
 fn main() {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| {
-            d.version(Some(format!("goto {}", env!("CARGO_PKG_VERSION"))))
-             .deserialize()
-        })
-        .unwrap_or_else(|e| {
-            exit(&format!("{}", e), e.fatal());
-        });
+    let args = Args::parse();
 
-    let shellcmd = args.flag_cmd.as_deref().unwrap_or(DEFAULT_SHELLCMD);
-    let name = args.arg_name.as_deref().unwrap_or("*");
-    let extra = args.arg_extra.as_deref().unwrap_or("");
+    let extra = args.extra.as_deref().unwrap_or("");
 
     let home = dirs::home_dir().unwrap_or_else(|| {
         exit("unable to determine home directory", true);
@@ -279,21 +277,21 @@ fn main() {
     for context_path in context_paths_by_len.iter().rev() {
         if cwd.starts_with(context_path) {
             let map = &config.contexts[*context_path];
-            if args.flag_list {
+            if args.list {
                 for (k, v) in map {
                     if let Entry::Vacant(entry) = effective_map.entry(k.clone()) {
                         entry.insert(v.clone());
                     }
                 }
-            } else if let Some(entry) = map.get(name) {
-                print_path(&entry.dest, shellcmd, extra);
+            } else if let Some(entry) = map.get(&args.name) {
+                print_path(&entry.dest, &args.command, extra);
                 done = true;
                 break;
             }
         }
     }
 
-    if args.flag_list {
+    if args.list {
         for (k, v) in config.global {
             if let Entry::Vacant(entry) = effective_map.entry(k) {
                 entry.insert(v);
@@ -304,8 +302,8 @@ fn main() {
         }
         done = true;
     } else if !done {
-        if let Some(entry) = config.global.get(name) {
-            print_path(&entry.dest, shellcmd, extra);
+        if let Some(entry) = config.global.get(&args.name) {
+            print_path(&entry.dest, &args.command, extra);
             done = true;
         }
     }

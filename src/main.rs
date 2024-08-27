@@ -249,7 +249,13 @@ fn print_path(path: &Path, shellcmd: &str, extra: &str) {
 }
 
 fn main() {
-    let args = Args::parse();
+    let args = Args::try_parse()
+        .unwrap_or_else(|e| {
+            // Clap by default writes usage text to stdout, which doesn't interact well with the
+            // output being `eval`'d by the shell, so print to stderr unconditionally.
+            eprintln!("{}", e.render().ansi());
+            std::process::exit(2);
+        });
 
     let extra = args.extra.as_deref().unwrap_or("");
 

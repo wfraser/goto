@@ -1,6 +1,6 @@
 //! goto :: Flexible Working Directory Shortcuts
 //!
-//! Copyright (c) 2016-2024 by William R. Fraser
+//! Copyright (c) 2016-2026 by William R. Fraser
 
 use std::collections::btree_map::*;
 use std::env;
@@ -70,12 +70,8 @@ fn read_config_toml(config_path: &Path) -> io::Result<toml::value::Table> {
     let mut config_text = String::new();
     let mut file = File::open(config_path)?;
     file.read_to_string(&mut config_text)?;
-    match toml::from_str(&config_text) {
-        Ok(config) => Ok(config),
-        Err(e) => {
-            Err(io::Error::new(io::ErrorKind::Other, format!("failed to parse TOML: {}", e)))
-        }
-    }
+    toml::from_str(&config_text)
+        .map_err(|e| io::Error::other(format!("failed to parse TOML: {e}")))
 }
 
 type PathMapping = BTreeMap<String, PathMappingEntry>;

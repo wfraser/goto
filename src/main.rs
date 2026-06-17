@@ -4,8 +4,8 @@
 
 use std::collections::btree_map::*;
 use std::env;
-use std::fs::File;
-use std::io::{self, Read, Write};
+use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use clap::Parser;
 
@@ -67,9 +67,7 @@ struct Args {
 }
 
 fn read_config_toml(config_path: &Path) -> io::Result<toml::value::Table> {
-    let mut config_text = String::new();
-    let mut file = File::open(config_path)?;
-    file.read_to_string(&mut config_text)?;
+    let config_text = fs::read_to_string(config_path)?;
     toml::from_str(&config_text)
         .map_err(|e| io::Error::other(format!("failed to parse TOML: {e}")))
 }

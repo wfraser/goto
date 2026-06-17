@@ -34,7 +34,10 @@ those projects, and type `goto`, and it brings you to that working directory.
 ### Configuration
 
 `goto` is configured by a simple plain text file in your home directory,
-`~/.goto.toml`. It uses the TOML format to express structure in an easy-to-read
+`~/.goto.toml`, or a `.goto.toml` file in the current directory, or in any of
+its parent directories.
+
+Config files use the TOML format to express structure in an easy-to-read
 way. (TOML is a lot like the well-known “INI” format, but better defined and
 more flexible.)
 
@@ -57,8 +60,8 @@ subdirectory of the path given. It then defines some more shortcuts specific to
 that context. The `*` shortcut is special: it is the default, used when you
 don’t call `goto` with any arguments.
 
-Paths are relative to your home directory, and the paths inside the context are
-relative to the path of the context itself.
+Paths are interpreted relative to the path the config file they are written in,
+and the paths inside a context are relative to the path of the context itself.
 
 So in this case, a common flow might be:
 

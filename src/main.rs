@@ -117,7 +117,7 @@ fn process_config(config_file_path: &Path, config_toml: toml::value::Table, rela
 
             let context_path = match parse_toml_as_path(&toml::Value::String(k), relative_to) {
                 Ok(path) => path,
-                Err(msg) => { return Err(format!("error: {}", msg)); }
+                Err(msg) => { return Err(format!("error: {msg}")); }
             };
 
             let mut context_map = PathMapping::new();
@@ -126,7 +126,7 @@ fn process_config(config_file_path: &Path, config_toml: toml::value::Table, rela
                 let mapped_path: PathBuf = match parse_toml_as_path(&path, &context_path) {
                     Ok(path) => path,
                     Err(msg) => {
-                        return Err(format!("error at {:?}.{}: {}", context_path, name, msg));
+                        return Err(format!("error at {context_path:?}.{name}: {msg}"));
                     }
                 };
 
@@ -143,8 +143,8 @@ fn process_config(config_file_path: &Path, config_toml: toml::value::Table, rela
                 Ok(path) => path,
                 Err(msg) => {
                     return Err(format!(
-                        "error at {}: expected a table or a path string, not {} ({})",
-                         k, v.type_str(), msg));
+                        "error at {k}: expected a table or a path string, not {} ({msg})",
+                         v.type_str()));
                 },
             };
 
@@ -180,12 +180,12 @@ fn read_config(config_path: &Path) -> Result<Option<Configuration>, String> {
     let config_toml = match read_config_toml(config_path) {
         Ok(toml) => toml,
         Err(ref e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(format!("failed to read configuration {:?}: {}", config_path, e)),
+        Err(e) => return Err(format!("failed to read configuration {config_path:?}: {e}")),
     };
 
     process_config(config_path, config_toml, config_path.parent().unwrap())
         .map_err(|msg| {
-            format!("invalid configuration in {:?}: {}", config_path, msg)
+            format!("invalid configuration in {config_path:?}: {msg}")
         })
         .map(Some)
 }
@@ -232,7 +232,7 @@ fn exit(msg: &str, fatal: bool) -> ! {
 
 fn print_path(path: &Path, shellcmd: &str, extra: &str) {
     if !shellcmd.is_empty() {
-        print!("{} ", shellcmd);
+        print!("{shellcmd} ");
     }
 
     // Because the path is potentially combined with the current working directory, which is
@@ -259,7 +259,7 @@ fn main() {
     let config_path = home.join(Path::new(CONFIG_FILENAME));
 
     let cwd = env::current_dir().unwrap_or_else(|e| {
-        exit(&format!("unable to get current working directory: {}", e), true);
+        exit(&format!("unable to get current working directory: {e}"), true);
     });
 
     let config = read_combine_configs(&config_path, &cwd).unwrap_or_else(|msg| {
